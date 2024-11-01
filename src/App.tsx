@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { SearchBar } from './components/SearchBar';
 import { HighlightCard } from './components/HighlightCard';
@@ -8,6 +8,7 @@ import { parseClippings } from './utils/parseClippings';
 import { Highlight, GroupedHighlights } from './types';
 import { BookOpen, Menu } from 'lucide-react';
 import { clsx } from 'clsx';
+import { api } from './utils/api';
 
 function App() {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -15,10 +16,30 @@ function App() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleFileUpload = (content: string) => {
+  useEffect(() => {
+    const loadHighlights = async () => {
+      try {
+        const savedHighlights = await api.loadHighlights();
+        setHighlights(savedHighlights);
+      } catch (error) {
+        console.error('Failed to load highlights:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadHighlights();
+  }, []);
+
+  const handleFileUpload = async (content: string) => {
     const parsedHighlights = parseClippings(content);
-    setHighlights(parsedHighlights);
+    try {
+      const savedHighlights = await api.saveHighlights(parsedHighlights);
+      setHighlights(savedHighlights);
+    } catch (error) {
+      console.error('Failed to save highlights:', error);
+    }
   };
 
   const filteredAndGroupedHighlights = useMemo(() => {
@@ -78,7 +99,11 @@ function App() {
       </header>
 
       <div className="pt-20">
-        {highlights.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-gray-500">Loading highlights...</div>
+          </div>
+        ) : highlights.length === 0 ? (
           <FileUpload onFileUpload={handleFileUpload} />
         ) : (
           <div className="flex">
